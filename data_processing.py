@@ -1,16 +1,8 @@
 from datasets import load_dataset
-from dataclasses import dataclass
 from transformers import AutoTokenizer
 import pandas as pd
 
-@dataclass
-class Request:
-    def __init__(self, id, prompt_len, response_len, l_qo, l_kv):
-        self.id = id
-        self.prompt_len = prompt_len
-        self.response_len = response_len
-        self.l_qo = l_qo
-        self.l_kv = l_kv
+from models import Request
 
 class DataProcessor:
     def __init__(self, tokenizer, dataset_name: str):

@@ -19,11 +19,13 @@ class WorkloadChunk:
 class WorkerMetrics:
     worker_id: int
     iterations: int
-    cache_misses: int
     latency_ns: int
     slack_ns: int
 
 @dataclass
 class EvaluationResult:
     makespan: int
+    num_steps: int
+    avg_step_latency: float
+    throughput: float # tokens/ns
     worker_metrics: list[WorkerMetrics]

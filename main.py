@@ -1,13 +1,13 @@
 from simulator import Simulator
 from transformers import AutoTokenizer
 from data_processing import DataProcessor
-from schedules import flash_attention, flash_decoding, lean_attention, flashinfer
+from schedules import Scheduler, Strategy
 from models import EvaluationResult
 
 
 def print_result(name: str, result: EvaluationResult) -> None:
-    col_w = [6, 12, 14, 14, 12, 8]
-    headers = ["Worker", "Iterations", "Cache Misses", "Latency (ns)", "Slack (ns)", "Load %"]
+    col_w = [6, 12, 14, 12, 8]
+    headers = ["Worker", "Iterations", "Latency (ns)", "Slack (ns)", "Load %"]
 
     title = f" {name} "
     total_w = sum(col_w) + len(col_w) * 3 + 1
@@ -25,61 +25,72 @@ def print_result(name: str, result: EvaluationResult) -> None:
     print(sep)
 
     for m in result.worker_metrics:
-        load = m.latency_ns / result.makespan * 100 if result.makespan else 0.0
+        load = (
+            m.latency_ns / result.makespan * 100
+            if result.makespan else 0.0
+        )
+
         print(row_fmt.format(
             m.worker_id,
             m.iterations,
-            m.cache_misses,
             m.latency_ns,
             m.slack_ns,
-            f"{load:.1f}%",
+            f"{load:.1f}%"
         ))
 
     print(sep)
 
-    avg_latency = sum(m.latency_ns for m in result.worker_metrics) / len(result.worker_metrics)
-    efficiency = avg_latency / result.makespan * 100 if result.makespan else 0.0
-    total_iters = sum(m.iterations for m in result.worker_metrics)
-    total_misses = sum(m.cache_misses for m in result.worker_metrics)
+    avg_latency = (
+        sum(m.latency_ns for m in result.worker_metrics)
+        / len(result.worker_metrics)
+    )
 
-    print(f"  Makespan      : {result.makespan:,} ns")
-    print(f"  Total iters   : {total_iters:,}")
-    print(f"  Total misses  : {total_misses:,}")
-    print(f"  Efficiency    : {efficiency:.1f}%  (avg worker load / makespan)")
+    efficiency = (
+        avg_latency / result.makespan * 100
+        if result.makespan else 0.0
+    )
+
+    total_iters = sum(
+        m.iterations
+        for m in result.worker_metrics
+    )
+
+    print(f"  Makespan          : {result.makespan:,} ns")
+    print(f"  Decode steps      : {result.num_steps:,}")
+    print(f"  Avg step latency  : {result.avg_step_latency:,.2f} ns")
+    print(f"  Throughput        : {result.throughput:,.2f} tokens/s")
+    print(f"  Total iterations  : {total_iters:,}")
+    print(f"  Efficiency        : {efficiency:.1f}%")
     print(bar)
 
+scheduler = Scheduler()
 
 simulator = Simulator(
-    page_size=256,
-    SRAM_size=4,
+    num_workers=5,
     iteration_cost=10,
-    cache_miss_penalty=100,
+    scheduler=scheduler
 )
 
 tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-v0.1")
 dp = DataProcessor(tokenizer, "Alignment-Lab-AI/CodeInterpreterData-sharegpt")
 out = dp.process(0)
 
-NUM_WORKERS = 5
-NUM_SPLITS = 4
-TILE_SIZE = 2
-
 print_result(
-    f"FlashAttention  |  workers={NUM_WORKERS}",
-    simulator.evaluate(flash_attention(out, NUM_WORKERS)),
+    f"FlashAttention  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.FLASH_ATTENTION, requests=out),
 )
 
 print_result(
-    f"FlashDecoding   |  workers={NUM_WORKERS}  splits={NUM_SPLITS}",
-    simulator.evaluate(flash_decoding(out, NUM_WORKERS, NUM_SPLITS)),
+    f"FlashDecoding  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.FLASH_DECODING, requests=out),
 )
 
 print_result(
-    f"LeanAttention   |  workers={NUM_WORKERS}  tile={TILE_SIZE}",
-    simulator.evaluate(lean_attention(out, NUM_WORKERS, TILE_SIZE)),
+    f"LeanAttention  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.LEAN_ATTENTION, requests=out),
 )
 
 print_result(
-    f"FlashInfer   |  workers={NUM_WORKERS}  tile={TILE_SIZE}",
-    simulator.evaluate(flashinfer(out, NUM_WORKERS, TILE_SIZE)),
+    f"FlashInfer  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.FLASH_INFER, requests=out),
 )

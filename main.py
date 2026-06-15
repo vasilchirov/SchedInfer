@@ -1,7 +1,7 @@
 from simulator import Simulator
 from transformers import AutoTokenizer
 from data_processing import DataProcessor
-from schedules import flash_attention, flash_decoding, lean_attention, flashinfer
+from schedules import flash_attention, flash_decoding, lean_attention, flashinfer, flashinfer_kk
 from models import EvaluationResult
 
 
@@ -82,4 +82,9 @@ print_result(
 print_result(
     f"FlashInfer   |  workers={NUM_WORKERS}  tile={TILE_SIZE}",
     simulator.evaluate(flashinfer(out, NUM_WORKERS, TILE_SIZE)),
+)
+
+print_result(
+    f"FlashInfer-KK  |  workers={NUM_WORKERS}",
+    simulator.evaluate(flashinfer_kk(out, NUM_WORKERS)),
 )

@@ -84,6 +84,8 @@ def lean_attention(requests: list[Request], num_workers: int, tile_size: int) ->
     return queues
 
 
+# ── FlashInfer (existing) ────────────────────────────────────────────────────
+
 from heapq import heapify, heappop, heappush
 from math import ceil
 
@@ -157,3 +159,70 @@ def flashinfer(
         )
 
     return queues
+
+
+# ── Karmarkar-Karp (new) ─────────────────────────────────────────────────────
+
+def flashinfer_kk(
+    requests: list[Request],
+    num_workers: int,
+) -> list[list[WorkloadChunk]]:
+    """
+    FlashInfer scheduling via k-way Karmarkar-Karp differencing.
+
+    Unlike LPT (flashinfer above), KK repeatedly merges the two most-imbalanced
+    partial assignments by pairing each heavy bin with the other's light bin.
+    This global view produces tighter partitions when chunk costs vary widely.
+
+    Cost model: ceil(l_qo * l_kv / 32), matching the simulator.
+    """
+    from itertools import count as icount
+
+    kv_offsets = _kv_offsets(requests)
+
+    total_work = sum(ceil(req.l_qo * req.l_kv / 32) for req in requests)
+    target_work = max(1, ceil(total_work / num_workers))
+
+    items: list[tuple[int, WorkloadChunk]] = []
+    for req, kv_base in zip(requests, kv_offsets):
+        kv_per_chunk = max(1, ceil(target_work * 32 / req.l_qo))
+        for offset in range(0, req.l_kv, kv_per_chunk):
+            l_kv = min(kv_per_chunk, req.l_kv - offset)
+            cost = ceil(req.l_qo * l_kv / 32)
+            items.append((cost, WorkloadChunk(
+                req_id=req.id, l_qo=req.l_qo,
+                l_kv=l_kv, kv_start=kv_base + offset,
+            )))
+
+    if not items:
+        return [[] for _ in range(num_workers)]
+
+    K = num_workers
+    tiebreak = icount()
+
+    # Heap entries: (-spread, unique_id, bin_loads_desc, assignments_parallel)
+    # unique_id prevents Python from comparing the lists on ties.
+    heap: list = []
+    for cost, chunk in items:
+        bins = [cost] + [0] * (K - 1)
+        asgn = [[chunk]] + [[] for _ in range(K - 1)]
+        heappush(heap, (-cost, next(tiebreak), bins, asgn))
+
+    while len(heap) > 1:
+        _, _, bins1, asgn1 = heappop(heap)
+        _, _, bins2, asgn2 = heappop(heap)
+
+        # Pair bins1[i] (heavy→light) with bins2[K-1-i] (light→heavy)
+        merged = sorted(
+            [(bins1[i] + bins2[K - 1 - i], asgn1[i] + asgn2[K - 1 - i])
+             for i in range(K)],
+            key=lambda x: -x[0],
+        )
+        new_bins = [m[0] for m in merged]
+        new_asgn = [m[1] for m in merged]
+
+        spread = new_bins[0] - new_bins[-1]
+        heappush(heap, (-spread, next(tiebreak), new_bins, new_asgn))
+
+    _, _, _, final_asgn = heap[0]
+    return [final_asgn[w] for w in range(K)]

@@ -6,8 +6,8 @@ from models import EvaluationResult
 
 
 def print_result(name: str, result: EvaluationResult) -> None:
-    col_w = [6, 12, 14, 12, 8]
-    headers = ["Worker", "Iterations", "Latency (ns)", "Slack (ns)", "Load %"]
+    col_w = [6, 12, 14, 14, 12, 8]
+    headers = ["Worker", "Iterations", "Cache Misses", "Latency (ns)", "Slack (ns)", "Load %"]
 
     title = f" {name} "
     total_w = sum(col_w) + len(col_w) * 3 + 1
@@ -33,12 +33,16 @@ def print_result(name: str, result: EvaluationResult) -> None:
         print(row_fmt.format(
             m.worker_id,
             m.iterations,
+            m.cache_misses,
             m.latency_ns,
             m.slack_ns,
             f"{load:.1f}%"
         ))
 
     print(sep)
+
+    total_iters = sum(m.iterations for m in result.worker_metrics)
+    total_misses = sum(m.cache_misses for m in result.worker_metrics)
 
     avg_latency = (
         sum(m.latency_ns for m in result.worker_metrics)
@@ -50,25 +54,24 @@ def print_result(name: str, result: EvaluationResult) -> None:
         if result.makespan else 0.0
     )
 
-    total_iters = sum(
-        m.iterations
-        for m in result.worker_metrics
-    )
-
     print(f"  Makespan          : {result.makespan:,} ns")
     print(f"  Decode steps      : {result.num_steps:,}")
     print(f"  Avg step latency  : {result.avg_step_latency:,.2f} ns")
     print(f"  Throughput        : {result.throughput:,.2f} tokens/s")
     print(f"  Total iterations  : {total_iters:,}")
+    print(f"  Total cache misses: {total_misses:,}")
     print(f"  Efficiency        : {efficiency:.1f}%")
     print(bar)
 
 scheduler = Scheduler()
 
 simulator = Simulator(
+    scheduler=scheduler,
     num_workers=5,
     iteration_cost=10,
-    scheduler=scheduler
+    cache_miss_penalty=100,
+    page_size=32,
+    sram_size=32
 )
 
 tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-v0.1")
@@ -81,9 +84,20 @@ print_result(
 )
 
 print_result(
+    f"FlashAttention  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.FLASH_ATTENTION, requests=out, enable_cache=True),
+)
+
+print_result(
     f"FlashDecoding  |  workers={scheduler.num_workers}",
     simulator.simulate(sched_strategy=Strategy.FLASH_DECODING, requests=out),
 )
+
+print_result(
+    f"FlashDecoding  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.FLASH_DECODING, requests=out, enable_cache=True),
+)
+
 
 print_result(
     f"LeanAttention  |  workers={scheduler.num_workers}",
@@ -91,6 +105,16 @@ print_result(
 )
 
 print_result(
+    f"LeanAttention  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.LEAN_ATTENTION, requests=out, enable_cache=True),
+)
+
+print_result(
     f"FlashInfer  |  workers={scheduler.num_workers}",
     simulator.simulate(sched_strategy=Strategy.FLASH_INFER, requests=out),
+)
+
+print_result(
+    f"FlashInfer  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.FLASH_INFER, requests=out, enable_cache=True),
 )

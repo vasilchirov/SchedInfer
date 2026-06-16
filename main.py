@@ -118,3 +118,13 @@ print_result(
     f"FlashInfer  |  workers={scheduler.num_workers}",
     simulator.simulate(sched_strategy=Strategy.FLASH_INFER, requests=out, enable_cache=True),
 )
+
+print_result(
+    f"FlashInfer-kk  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.FLASH_INFER_KK, requests=out),
+)
+
+print_result(
+    f"FlashInfer-kk  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.FLASH_INFER_KK, requests=out, enable_cache=True),
+)

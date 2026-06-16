@@ -232,6 +232,7 @@ class Strategy(Enum):
     FLASH_DECODING = 2
     LEAN_ATTENTION = 3
     FLASH_INFER = 4
+    FLASH_INFER_KK = 5
 
 class Scheduler:
     def __init__(self, num_workers: int = 5, num_splits: int = 5, tile_size: int = 5, query_tile_size: int = 5):
@@ -250,5 +251,7 @@ class Scheduler:
             return lean_attention(requests, self.num_workers, self.tile_size)
         if sched_strategy is Strategy.FLASH_INFER:
             return flashinfer(requests, self.num_workers, self.query_tile_size)
+        if sched_strategy is Strategy.FLASH_INFER_KK:
+            return flashinfer_kk(requests, self.num_workers)
 
         raise ValueError(f"Unknown scheduling strategy: {sched_strategy}")

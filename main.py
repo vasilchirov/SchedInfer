@@ -1,7 +1,7 @@
 from simulator import Simulator
 from transformers import AutoTokenizer
 from data_processing import DataProcessor
-from schedules import Scheduler, Strategy
+from schedules import flash_attention, flash_decoding, lean_attention, flashinfer, flashinfer_kk, Scheduler, Strategy
 from models import EvaluationResult
 
 
@@ -117,4 +117,14 @@ print_result(
 print_result(
     f"FlashInfer  |  workers={scheduler.num_workers}",
     simulator.simulate(sched_strategy=Strategy.FLASH_INFER, requests=out, enable_cache=True),
+)
+
+print_result(
+    f"FlashInfer-kk  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.FLASH_INFER_KK, requests=out),
+)
+
+print_result(
+    f"FlashInfer-kk  |  workers={scheduler.num_workers}",
+    simulator.simulate(sched_strategy=Strategy.FLASH_INFER_KK, requests=out, enable_cache=True),
 )

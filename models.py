@@ -26,4 +26,7 @@ class WorkerMetrics:
 @dataclass
 class EvaluationResult:
     makespan: int
+    num_steps: int
+    avg_step_latency: float
+    throughput: float # tokens/s
     worker_metrics: list[WorkerMetrics]

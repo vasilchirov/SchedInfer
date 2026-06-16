@@ -1,7 +1,8 @@
+from enum import Enum
+from heapq import heapify, heappop, heappush
 from math import ceil
 
 from models import Request, WorkloadChunk
-
 
 def _kv_offsets(requests: list[Request]) -> list[int]:
     offsets, pos = [], 0
@@ -160,7 +161,6 @@ def flashinfer(
 
     return queues
 
-
 # ── Karmarkar-Karp (new) ─────────────────────────────────────────────────────
 
 def flashinfer_kk(
@@ -226,3 +226,29 @@ def flashinfer_kk(
 
     _, _, _, final_asgn = heap[0]
     return [final_asgn[w] for w in range(K)]
+
+class Strategy(Enum):
+    FLASH_ATTENTION = 1
+    FLASH_DECODING = 2
+    LEAN_ATTENTION = 3
+    FLASH_INFER = 4
+
+class Scheduler:
+    def __init__(self, num_workers: int = 5, num_splits: int = 5, tile_size: int = 5, query_tile_size: int = 5):
+        
+        self.num_workers = num_workers
+        self.num_splits = num_splits
+        self.tile_size = tile_size
+        self.query_tile_size = query_tile_size
+
+    def run(self, sched_strategy: Strategy, requests: list[Request]) -> list[list[WorkloadChunk]]:
+        if sched_strategy is Strategy.FLASH_ATTENTION:
+            return flash_attention(requests, self.num_workers)
+        if sched_strategy is Strategy.FLASH_DECODING:
+            return flash_decoding(requests, self.num_workers, self.num_splits)
+        if sched_strategy is Strategy.LEAN_ATTENTION:
+            return lean_attention(requests, self.num_workers, self.tile_size)
+        if sched_strategy is Strategy.FLASH_INFER:
+            return flashinfer(requests, self.num_workers, self.query_tile_size)
+
+        raise ValueError(f"Unknown scheduling strategy: {sched_strategy}")

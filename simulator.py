@@ -5,7 +5,7 @@ from models import WorkloadChunk, WorkerMetrics, EvaluationResult, Request
 from schedules import Scheduler, Strategy
 
 class Simulator:
-    def __init__(self, scheduler: Scheduler, num_workers: int, iteration_cost: int=10, cache_miss_penalty: int=100, page_size: int=32, sram_size: int=8):
+    def __init__(self, scheduler: Scheduler, num_workers: int, iteration_cost: int=1, cache_miss_penalty: int=100, page_size: int=32, sram_size: int=8):
         self.num_workers = num_workers
         self.eval = Evaluator(
             iteration_cost=iteration_cost,

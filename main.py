@@ -1,6 +1,5 @@
 from simulator import Simulator
-from transformers import AutoTokenizer
-from data_processing import DataProcessor
+from data_processing import load_requests
 from schedules import Scheduler, Strategy
 from models import EvaluationResult
 
@@ -74,9 +73,7 @@ simulator = Simulator(
     sram_size=32
 )
 
-tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-v0.1")
-dp = DataProcessor(tokenizer, "Alignment-Lab-AI/CodeInterpreterData-sharegpt")
-out = dp.process(0)
+out = load_requests(0)
 
 print_result(
     f"FlashAttention  |  workers={scheduler.num_workers}",

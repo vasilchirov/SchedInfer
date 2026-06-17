@@ -1,0 +1,3 @@
+experiment,num_workers,strategy,strategy_label,avg_l_qo,avg_l_kv,makespan_ns,num_steps,avg_step_latency_ns,throughput_tokens_per_s,lir
+rq2_solver_comparison,108,FLASH_INFER,Flash Infer,202.36805555555554,1105.3564814814815,427434,2272,188.13116197183098,389835623.74542034,1.063893198845962
+rq2_solver_comparison,108,FLASH_INFER_KK,Flash Infer Kk,202.36805555555554,1105.3564814814815,189927,2272,83.59463028169014,877331816.9612535,1.3129751989701206
